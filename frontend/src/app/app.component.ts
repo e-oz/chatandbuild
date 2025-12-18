@@ -1,6 +1,6 @@
-import { Component, OnInit } from '@angular/core';
-import { RouterOutlet, RouterLink, RouterLinkActive } from '@angular/router';
 import { CommonModule } from '@angular/common';
+import { Component, inject, OnInit, signal } from '@angular/core';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { WorkspaceService } from './services/workspace.service';
 
 @Component({
@@ -18,12 +18,16 @@ import { WorkspaceService } from './services/workspace.service';
         </nav>
       </header>
       <main class="app-main">
-        <div *ngIf="isInitializing" class="init-status">
-          <p>Initializing project...</p>
-        </div>
-        <div *ngIf="initError" class="init-error">
-          <p>⚠️ Initialization warning: {{ initError }}</p>
-        </div>
+        @if (isInitializing()) {
+          <div class="init-status">
+            <p>Initializing project...</p>
+          </div>
+        }
+        @if (initError()) {
+          <div class="init-error">
+            <p>⚠️ Initialization warning: {{ initError() }}</p>
+          </div>
+        }
         <router-outlet></router-outlet>
       </main>
     </div>
@@ -87,25 +91,23 @@ import { WorkspaceService } from './services/workspace.service';
   `]
 })
 export class AppComponent implements OnInit {
-  title = 'ChatAndBuild.com - Angular Assessment';
-  isInitializing = true;
-  initError: string | null = null;
-
-  constructor(private workspaceService: WorkspaceService) { }
+  protected readonly isInitializing = signal(true);
+  protected readonly initError = signal<string | null>(null);
+  private readonly workspaceService = inject(WorkspaceService);
 
   ngOnInit() {
     this.initializeProject();
   }
 
   initializeProject() {
-    this.isInitializing = true;
+    this.isInitializing.set(true);
     this.workspaceService.initializeProject().subscribe({
       next: (response) => {
-        this.isInitializing = false;
+        this.isInitializing.set(false);
         console.log('Project initialized:', response);
 
         if (!response.success) {
-          this.initError = response.message || 'Initialization completed with warnings';
+          this.initError.set(response.message || 'Initialization completed with warnings');
         }
 
         // Log initialization details
@@ -116,9 +118,12 @@ export class AppComponent implements OnInit {
         }
       },
       error: (error) => {
-        this.isInitializing = false;
-        this.initError = 'Failed to initialize project. Please check backend connection.';
+        this.isInitializing.set(false);
+        this.initError.set('Failed to initialize project. Please check backend connection.');
         console.error('Initialization error:', error);
+      },
+      complete: () => {
+        this.isInitializing.set(false);
       }
     });
   }

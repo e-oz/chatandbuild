@@ -1,6 +1,7 @@
-import { Component, OnInit } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { HttpClient } from '@angular/common/http';
+import { DatePipe } from '@angular/common';
+import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { AppStore } from '../stores/app.store';
+import { MessagesStore } from '../stores/messages.store';
 // Optional: You can use the MessageService from services/message.service.ts instead of HttpClient directly
 // import { MessageService, Message } from '../services/message.service';
 // import { WorkspaceService, Workspace } from '../services/workspace.service';
@@ -26,87 +27,30 @@ import { HttpClient } from '@angular/common/http';
 //
 // Note: MessageService and WorkspaceService are available in services/ if you prefer to use them
 
-interface Message {
-  _id: string;
-  workspaceId: string;
-  content: string;
-  author: {
-    name: string;
-    userId?: string;
-    avatar?: string;
-  };
-  type: 'text' | 'file' | 'system';
-  createdAt: string;
-  isEdited?: boolean;
-}
-
-interface Workspace {
-  _id: string;
-  name: string;
-  description?: string;
-  type: 'public' | 'private';
-}
-
 @Component({
   selector: 'app-task1',
   standalone: true,
-  imports: [CommonModule],
-  template: `
-    <div class="task1-container">
-      <h2>Task 1: Workspace Chat Messages Display</h2>
-      <p class="task-description">
-        Fetch and display workspace chat messages from the API. 
-        Show messages in a simple list with author name, content, timestamp, and message type.
-      </p>
-      
-      <!-- TODO: Implement the messages display here -->
-      <div class="placeholder">
-        <p>Your implementation goes here...</p>
-        <p class="hint">Display messages in a list format showing: content, author name, timestamp, and message type.</p>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .task1-container {
-      max-width: 1200px;
-      margin: 0 auto;
-      padding: 1rem;
-    }
-    .task-description {
-      color: #666;
-      margin-bottom: 2rem;
-      line-height: 1.6;
-    }
-    .placeholder {
-      padding: 3rem;
-      text-align: center;
-      background: #f5f5f5;
-      border-radius: 8px;
-      color: #999;
-    }
-    .hint {
-      font-size: 0.9rem;
-      margin-top: 1rem;
-      color: #aaa;
-    }
-  `]
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  templateUrl: './task1.component.html',
+  imports: [
+    DatePipe
+  ],
+  host: {
+    class: 'flex flex-col gap-4 w-full',
+  }
 })
-export class Task1Component implements OnInit {
-  // TODO: Add your implementation here
-  // Suggested properties:
-  // - messages: Message[] = [];
-  // - workspace: Workspace | null = null;
-  // - loading: boolean = false;
-  // - error: string | null = null;
+export class Task1Component {
+  // TODO: Pagination
   // - currentPage: number = 1;
   // - hasMore: boolean = true;
 
-  constructor(private http: HttpClient) { }
+  private readonly messagesStore = inject(MessagesStore);
+  private readonly appStore = inject(AppStore);
 
-  ngOnInit() {
-    // TODO: 
-    // 1. Fetch a workspace (or use a hardcoded ID)
-    // 2. Fetch messages for that workspace
-    // 3. Handle loading and error states
-  }
+  protected readonly isLoading = computed(() => {
+    return this.appStore.isLoadingInitialWorkspace() || this.messagesStore.collection.$isReading();
+  });
+
+  protected readonly messages = this.messagesStore.collection.$items;
+  protected readonly lastError = this.messagesStore.collection.$lastReadError;
 }

@@ -1,66 +1,17 @@
-import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
+import { inject, Injectable } from '@angular/core';
 import { Observable } from 'rxjs';
+import type { Message } from '../types/message';
+import type { MessageListResponse } from '../types/message-list-response';
+import type { SendMessageRequest } from '../types/send-message-request';
 
-export interface Message {
-    _id: string;
-    workspaceId: string;
-    content: string;
-    author: {
-        name: string;
-        userId?: string;
-        avatar?: string;
-    };
-    type: 'text' | 'file' | 'system';
-    metadata?: {
-        fileName?: string;
-        fileSize?: number;
-        fileType?: string;
-        fileUrl?: string;
-    };
-    editedAt?: string;
-    isEdited?: boolean;
-    reactions?: Array<{
-        emoji: string;
-        userId: string;
-        createdAt: Date;
-    }>;
-    createdAt: string;
-    updatedAt: string;
-}
-
-export interface SendMessageRequest {
-    content: string;
-    author: {
-        name: string;
-        userId?: string;
-        avatar?: string;
-    };
-    type?: 'text' | 'file' | 'system';
-    metadata?: {
-        fileName?: string;
-        fileSize?: number;
-        fileType?: string;
-        fileUrl?: string;
-    };
-}
-
-export interface MessageListResponse {
-    success: boolean;
-    count: number;
-    total: number;
-    page: number;
-    pages: number;
-    data: Message[];
-}
 
 @Injectable({
     providedIn: 'root'
 })
 export class MessageService {
-    private apiUrl = '/api';
-
-    constructor(private http: HttpClient) { }
+    private readonly apiUrl = '/api';
+    private readonly http = inject(HttpClient);
 
     getWorkspaceMessages(workspaceId: string, params?: {
         page?: number;

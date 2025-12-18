@@ -29,25 +29,6 @@ import { HttpClient } from '@angular/common/http';
 //
 // Note: WorkspaceService and MessageService are available in services/ if you prefer to use them
 
-interface WorkspaceResult {
-  _id: string;
-  name: string;
-  description?: string;
-  type: 'public' | 'private';
-  createdAt: string;
-}
-
-interface MessageResult {
-  _id: string;
-  content: string;
-  author: {
-    name: string;
-    userId?: string;
-  };
-  type: 'text' | 'file' | 'system';
-  createdAt: string;
-}
-
 @Component({
   selector: 'app-task2',
   standalone: true,

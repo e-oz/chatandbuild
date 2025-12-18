@@ -1,46 +1,16 @@
-import { Injectable } from '@angular/core';
+import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
-
-export interface Workspace {
-    _id: string;
-    name: string;
-    description?: string;
-    type: 'public' | 'private';
-    createdBy?: string;
-    members?: Array<{
-        userId: string;
-        role: 'owner' | 'admin' | 'member';
-        joinedAt: Date;
-    }>;
-    createdAt: string;
-    updatedAt: string;
-    messageCount?: number;
-}
-
-export interface CreateWorkspaceRequest {
-    name: string;
-    description?: string;
-    type?: 'public' | 'private';
-    createdBy?: string;
-}
-
-export interface WorkspaceListResponse {
-    success: boolean;
-    count: number;
-    total: number;
-    page: number;
-    pages: number;
-    data: Workspace[];
-}
+import type { CreateWorkspaceRequest } from '../types/create-workspace-request';
+import type { Workspace } from '../types/workspace';
+import type { WorkspaceListResponse } from '../types/workspace-list-response';
 
 @Injectable({
     providedIn: 'root'
 })
 export class WorkspaceService {
-    private apiUrl = '/api';
-
-    constructor(private http: HttpClient) { }
+    private readonly apiUrl = '/api';
+    private readonly http = inject(HttpClient);
 
     getAllWorkspaces(params?: {
         page?: number;
