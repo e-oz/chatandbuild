@@ -1,7 +1,9 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
-import { FormBuilder, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { ChangeDetectionStrategy, Component, inject, linkedSignal, signal, untracked } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { AppStore } from '../stores/app.store';
+import { MessagesStore } from '../stores/messages.store';
+import { WorkspacesStore } from '../stores/workspaces.store';
+import type { Workspace } from '../types/workspace';
 // Optional: You can use the WorkspaceService and MessageService from services/ instead of HttpClient directly
 // import { WorkspaceService, Workspace, CreateWorkspaceRequest } from '../services/workspace.service';
 // import { MessageService, SendMessageRequest } from '../services/message.service';
@@ -32,67 +34,135 @@ import { HttpClient } from '@angular/common/http';
 @Component({
   selector: 'app-task2',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
-  template: `
-    <div class="task2-container">
-      <h2>Task 2: Create Workspace & Send Messages</h2>
-      <p class="task-description">
-        Create a form to create workspaces and send messages.
-        Add basic validation and show success/error messages.
-      </p>
-      
-      <!-- TODO: Implement the workspace creation form and message sending form here -->
-      <div class="placeholder">
-        <p>Your implementation goes here...</p>
-        <p class="hint">Create a workspace first, then allow users to send messages to that workspace.</p>
-      </div>
-    </div>
-  `,
-  styles: [`
-    .task2-container {
-      max-width: 800px;
-      margin: 0 auto;
-      padding: 1rem;
-    }
-    .task-description {
-      color: #666;
-      margin-bottom: 2rem;
-      line-height: 1.6;
-    }
-    .placeholder {
-      padding: 3rem;
-      text-align: center;
-      background: #f5f5f5;
-      border-radius: 8px;
-      color: #999;
-    }
-    .hint {
-      font-size: 0.9rem;
-      margin-top: 1rem;
-      color: #aaa;
-    }
-  `]
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [ReactiveFormsModule],
+  templateUrl: './task2.template.html',
+  host: {
+    class: 'flex flex-col gap-4 lg:gap-6 w-full',
+  },
 })
 export class Task2Component {
-  // TODO: Add your implementation here
-  // Suggested properties:
-  // - workspaceForm: FormGroup;
-  // - messageForm: FormGroup;
-  // - createdWorkspace: WorkspaceResult | null = null;
-  // - loading: boolean = false;
-  // - error: string | null = null;
-  // - success: string | null = null;
+  private readonly workspacesStore = inject(WorkspacesStore);
+  private readonly messagesStore = inject(MessagesStore);
+  private readonly appStore = inject(AppStore);
+  protected readonly workspace = linkedSignal<Workspace | undefined>(() => {
+    return this.appStore.currentWorkspace();
+  });
+  protected readonly errors = signal<string[]>([]);
+  protected readonly successMessage = signal<{ message: string; id: string } | undefined>(undefined);
+  protected readonly isCreatingWorkspace = this.workspacesStore.isCreating;
+  protected readonly isAddingMessage = this.messagesStore.collection.$isCreating;
 
-  constructor(
-    private fb: FormBuilder,
-    private http: HttpClient
-  ) {
-    // TODO: Initialize forms with validators
+  protected readonly workspaceForm = new FormGroup({
+    name: new FormControl('', Validators.required),
+    description: new FormControl(''),
+    type: new FormControl<'public' | 'private' | undefined>('public', { nonNullable: true }),
+  });
+
+  protected readonly messageForm = new FormGroup({
+    content: new FormControl('', Validators.required),
+    type: new FormControl<'text' | 'file' | 'system'>('text', { nonNullable: true }),
+    authorName: new FormControl<string | undefined>(undefined),
+  });
+
+  protected newWorkspaceForm() {
+    this.workspace.set(undefined);
+    this.workspaceForm.reset();
+    this.messageForm.reset();
+    this.resetErrors();
   }
 
-  // TODO: Implement methods:
-  // - createWorkspace(): void
-  // - sendMessage(): void
-  // - resetForms(): void
-  // - Helper methods for validation and error handling
+  protected createWorkspace() {
+    this.resetErrors();
+    const formValue = this.workspaceForm.value;
+    if (!formValue.name) {
+      this.addError('Workspace name is required');
+      return;
+    }
+
+    if (!this.workspaceForm.valid) {
+      this.addError('Please check the workspace form - some fields have invalid values');
+      return;
+    }
+
+    this.workspacesStore.createWorkspace({
+      name: formValue.name,
+      description: formValue.description || undefined,
+      type: formValue.type || undefined
+    }, {
+      onError: () => this.addError('Something went wrong - workspace could not be created'),
+      next: (workspace) => {
+        if (workspace) {
+          this.workspace.set(workspace as Workspace);
+        }
+        this.showSuccessMessage('Workspace created successfully');
+      }
+    });
+  }
+
+  protected sendMessage() {
+    this.resetErrors();
+
+    const workspace = this.workspace();
+    if (!workspace) {
+      this.addError('Please create a workspace first');
+      return;
+    }
+
+    const formValue = this.messageForm.value;
+    if (!formValue.content) {
+      this.addError('Message text is required');
+      return;
+    }
+    if (!formValue.authorName) {
+      this.addError('Author name is required');
+      return;
+    }
+
+    if (!this.messageForm.valid) {
+      this.addError('Please check the message form - some fields have invalid values');
+      return;
+    }
+
+    this.messagesStore.addMessage({
+      workspaceId: workspace._id,
+      request: {
+        content: formValue.content,
+        type: formValue.type || 'text',
+        author: {
+          name: formValue.authorName,
+        }
+      }
+    }, {
+      next: () => {
+        this.messageForm.reset();
+        this.showSuccessMessage('Message sent successfully.');
+      },
+      onError: (e) => {
+        console.error(e)
+        this.addError('Something went wrong - message could not be sent');
+      },
+    });
+  }
+
+  private addError(error: string) {
+    this.errors.update((errors) => ([...errors, error]));
+  }
+
+  private resetErrors() {
+    this.errors.set([]);
+  }
+
+  private showSuccessMessage(message: string) {
+    const id = Math.ceil(Math.random() * 100000000).toString();
+    this.successMessage.set({
+      id, message
+    });
+    setTimeout(() => {
+      const currentMessage = untracked(this.successMessage);
+      if (currentMessage?.id === id) {
+        this.successMessage.set(undefined);
+      }
+    }, 3000);
+  }
 }

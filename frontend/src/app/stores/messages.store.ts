@@ -1,9 +1,11 @@
 import { inject, Injectable } from '@angular/core';
 import { toObservable } from '@angular/core/rxjs-interop';
-import { Collection } from 'ngx-collection';
-import { distinctUntilChanged, filter, map, of, shareReplay, switchMap, throwError } from 'rxjs';
+import { Collection, createEffect } from 'ngx-collection';
+import { catchError, distinctUntilChanged, EMPTY, exhaustMap, filter, map, of, shareReplay, switchMap, throwError } from 'rxjs';
 import { MessageService } from '../services/message.service';
 import type { Message } from '../types/message';
+import type { SendMessageRequest } from '../types/send-message-request';
+import type { WorkspaceId } from '../types/workspace';
 import { AppStore } from './app.store';
 
 @Injectable({ providedIn: 'root' })
@@ -34,4 +36,21 @@ export class MessagesStore {
       ),
     },
   });
+
+  public readonly addMessage = createEffect<{ workspaceId: WorkspaceId; request: SendMessageRequest }>((_, callbacks) => _.pipe(
+    exhaustMap((params) => this.collection.create({
+      request: this.messagesSrv.sendMessage(params.workspaceId, params.request).pipe(
+        exhaustMap((response) => {
+          if (!response?.success || !response.data) {
+            return throwError(() => 'Failed to send message');
+          } else {
+            return of(response.data);
+          }
+        })
+      ),
+      onSuccess: callbacks.success,
+      onError: callbacks.error,
+    })),
+    catchError(() => EMPTY)
+  ));
 }
